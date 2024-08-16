@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event to ICS Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, textarea, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Create Calendar Event</h1>
+        <form id="eventForm">
+            <label for="title">Event Title:</label>
+            <input type="text" id="title" name="title" value="Team Meeting" required>
+
+            <label for="description">Event Description:</label>
+            <textarea id="description" name="description">Monthly team meeting to discuss project updates and goals.</textarea>
+
+            <label for="location">Location:</label>
+            <input type="text" id="location" name="location" value="Conference Room A">
+
+            <label for="startDate">Start Date and Time:</label>
+            <input type="datetime-local" id="startDate" name="startDate" value="2024-08-30T09:00:00" required>
+
+            <label for="endDate">End Date and Time:</label>
+            <input type="datetime-local" id="endDate" name="endDate" value="2024-08-30T10:00:00" required>
+
+            <label for="recurrence">Recurrence:</label>
+            <select id="recurrence" name="recurrence">
+                <option value="">None</option>
+                <option value="DAILY">Daily</option>
+                <option value="WEEKLY" selected="selected">Weekly</option>
+                <option value="MONTHLY">Monthly</option>
+                <option value="YEARLY">Yearly</option>
+            </select>
+
+            <label for="recurrenceEnd">Recurrence End Date (optional):</label>
+            <input type="date" id="recurrenceEnd" name="recurrenceEnd">
+
+            <button type="button" onclick="generateICS()">Generate ICS File</button>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/rrule@2.8.1/dist/es5/rrule.min.js"></script>
+    <script>
+        function formatDateTimeForICS(dateTime) {
+            const date = new Date(dateTime);
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            const hours = String(date.getUTCHours()).padStart(2, '0');
+            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+            return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+        }
+
+        function sanitizeFileName(name) {
+            return name.replace(/[\/\\?%*:|"<>]/g, '_');
+        }
+
+        function generateRecurrenceRule(freq, untilDate) {
+            let rule = '';
+            switch (freq) {
+                case 'DAILY':
+                    rule = 'FREQ=DAILY';
+                    break;
+                case 'WEEKLY':
+                    rule = 'FREQ=WEEKLY';
+                    break;
+                case 'MONTHLY':
+                    rule = 'FREQ=MONTHLY';
+                    break;
+                case 'YEARLY':
+                    rule = 'FREQ=YEARLY';
+                    break;
+                default:
+                    return '';
+            }
+
+            if (untilDate) {
+                const until = formatDateTimeForICS(untilDate);
+                rule += `;UNTIL=${until}`;
+            }
+
+            return rule;
+        }
+
+        function generateICS() {
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            const location = document.getElementById('location').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const recurrence = document.getElementById('recurrence').value;
+            const recurrenceEnd = document.getElementById('recurrenceEnd').value;
+
+            if (!title || !startDate || !endDate) {
+                alert('Please fill out the required fields.');
+                return;
+            }
+
+            const formattedStartDate = formatDateTimeForICS(startDate);
+            const formattedEndDate = formatDateTimeForICS(endDate);
+            const sanitizedTitle = sanitizeFileName(title);
+            const recurrenceRule = generateRecurrenceRule(recurrence, recurrenceEnd);
+
+            const icsData = `
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Your Organization//NONSGML v1.0//EN
+BEGIN:VEVENT
+SUMMARY:${title}
+DESCRIPTION:${description}
+LOCATION:${location}
+DTSTART:${formattedStartDate}
+DTEND:${formattedEndDate}
+${recurrenceRule ? `RRULE:${recurrenceRule}` : ''}
+END:VEVENT
+END:VCALENDAR
+`;
+
+            const blob = new Blob([icsData], { type: 'text/calendar' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${sanitizedTitle}.ics`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
